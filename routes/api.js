@@ -3,21 +3,26 @@ const router = express.Router();
 const Task = require('../models/task');
 
 router.get('/tasks', (req, res, next) => {
-  // This will return all the data, exposing only the id and action field to the client
     Task.find({}, 'action')
         .then((data) => res.json(data))
         .catch(next);
 });
 
 router.post('/tasks', (req, res, next) => {
-    if (req.body.action) {
-        Task.create(req.body)
-            .then((data) => res.json(data))
-            .catch(next);
-    } else {
+    if (!req.body) {
         res.json({
-            error: 'The input field is empty',
+            error: 'body is empty',
         });
+    }else{    
+        if (req.body.action) {
+            Task.create(req.body)
+                .then((data) => res.json(data))
+                .catch(next);
+        } else {
+            res.json({
+                error: 'The input field is empty',
+            });
+        }
     }
 });
 
