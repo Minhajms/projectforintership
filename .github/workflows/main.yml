@@ -11,7 +11,7 @@ jobs:
     steps:
       # Step 1: Checkout Code
       - name: Checkout Code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # Step 2: Log in to Docker Hub
       - name: Log in to Docker Hub
@@ -41,16 +41,11 @@ jobs:
           chmod 400 ~/.ssh/docker1.pem
           ssh-keyscan -H ${{ secrets.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
 
-      # Step 5: Debug SSH Key (Optional, for debugging)
-      - name: Debug SSH Key
-        run: |
-          ls -la ~/.ssh/
-          ssh -i ~/.ssh/docker1.pem ubuntu@${{ secrets.EC2_PUBLIC_IP }} -o StrictHostKeyChecking=no echo "SSH connection successful"
-
-      # Step 6: Deploy on EC2
+      # Step 5: Deploy on EC2
       - name: Deploy on EC2
         run: |
           ssh -i ~/.ssh/docker1.pem ubuntu@${{ secrets.EC2_PUBLIC_IP }} << EOF
+          set -e  # Exit on error
           docker pull minhajms/mern-backend:latest
           docker pull minhajms/mern-db:latest
           docker pull minhajms/mern-frontend:latest
