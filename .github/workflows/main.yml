@@ -11,58 +11,58 @@ jobs:
     steps:
       # Step 1: Checkout Code
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
-      # Step 2: Log in to Docker Hub
+      # Step 2: Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      # Step 3: Install Dependencies and Build Backend
+      - name: Install Backend Dependencies
+        run: |
+          npm install
+          npm run build
+
+      # Step 4: Build and Push Docker Images
       - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push Backend Docker Image
         run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
 
-      # Step 3: Build and Push Docker Images
-      - name: Build Backend Docker Image and Push to Docker Hub
+      - name: Build and Push Frontend Docker Image
         run: |
-          docker build -t minhajms/mern-backend:latest ./backend
-          docker push minhajms/mern-backend:latest
+          cd client
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
 
-      - name: Build Database Docker Image and Push to Docker Hub
+      # Step 5: Set up SSH for EC2
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      # Step 6: Deploy on EC2
+      - name: Deploy on EC2
         run: |
-          docker build -t minhajms/mern-db:latest ./db
-          docker push minhajms/mern-db:latest
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
+          docker pull ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
+          docker pull ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
 
-      - name: Build Frontend Docker Image and Push to Docker Hub
-        run: |
-          docker build -t minhajms/mern-frontend:latest ./frontend
-          docker push minhajms/mern-frontend:latest
-
-      # Step 4: Set up SSH for EC2 Deployment
-      - name: Set up SSH for EC2
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2-key.pem
-          chmod 400 ~/.ssh/ec2-key.pem
-          ssh-keyscan -H ${{ secrets.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
-
-      # Step 5: Deploy the MERN Stack on EC2
-      - name: Deploy MERN Stack on EC2
-        run: |
-          ssh -i ~/.ssh/ec2-key.pem ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
-          set -e  # Exit on error
-
-          # Pull the latest Docker images
-          docker pull minhajms/mern-backend:latest
-          docker pull minhajms/mern-db:latest
-          docker pull minhajms/mern-frontend:latest
-
-          # Stop and remove old containers if they exist
+          # Stop and remove old containers
           docker stop mern-backend || true
           docker rm mern-backend || true
-          docker stop mern-db || true
-          docker rm mern-db || true
           docker stop mern-frontend || true
           docker rm mern-frontend || true
 
           # Run new containers
-          docker run -d --name mern-backend -p 5000:5000 minhajms/mern-backend:latest
-          docker run -d --name mern-db -p 27017:27017 minhajms/mern-db:latest
-          docker run -d --name mern-frontend -p 80:80 minhajms/mern-frontend:latest
+          docker run -d --name mern-backend -p 5000:5000 ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
+          docker run -d --name mern-frontend -p 80:80 ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
           EOF
