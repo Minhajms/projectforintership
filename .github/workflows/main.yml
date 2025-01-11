@@ -45,39 +45,36 @@ jobs:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
       # Step 5: Deploy on EC2
-      - name: Deploy on EC2
-        run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
-          set -e
-          echo "Starting deployment on EC2..."
+     - name: Deploy on EC2
+  run: |
+    ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
+    set -e
+    echo "Starting deployment on EC2..."
 
-          # Pull updated Docker images
-          docker pull ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
-          docker pull ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
-          docker pull ${{ secrets.DOCKER_USERNAME }}/mern-db:latest || docker pull mongo:latest
+    # Stop and remove old containers
+    docker stop mern-backend mern-frontend mern-database 2>/dev/null || true
+    docker rm mern-backend mern-frontend mern-database 2>/dev/null || true
 
-          # Stop and remove old containers
-          docker stop mern-backend mern-frontend mern-database || true
-          docker rm mern-backend mern-frontend mern-database || true
+    # Pull updated Docker images
+    docker pull ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
+    docker pull ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
+    docker pull mongo:latest
 
-          # Run MongoDB container
-          echo "Starting MongoDB..."
-          docker run -d --name mern-database -p 27017:27017 -v mern-db-data:/data/db ${{ secrets.DOCKER_USERNAME }}/mern-db:latest
+    # Start MongoDB
+    docker run -d --name mern-database -p 27017:27017 -v mern-db-data:/data/db mongo:latest || docker start mern-database
 
-          # Wait for MongoDB to initialize
-          until docker exec mern-database mongo --eval "db.runCommand('ping')" > /dev/null 2>&1; do
-            echo "Waiting for MongoDB to initialize..."
-            sleep 5
-          done
-          echo "MongoDB is ready!"
+    # Wait for MongoDB to initialize
+    until docker exec mern-database mongo --eval "db.adminCommand('ping')" > /dev/null 2>&1; do
+      echo "Waiting for MongoDB to initialize..."
+      sleep 5
+    done
+    echo "MongoDB is ready!"
 
-          # Run Backend container
-          echo "Starting Backend..."
-          docker run -d --name mern-backend -p 5000:5000 --env-file /home/ubuntu/backend/.env --link mern-database:mongo ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
+    # Start Backend
+    docker run -d --name mern-backend -p 5000:5000 --env-file /home/ubuntu/backend/.env --link mern-database:mongo ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest || docker start mern-backend
 
-          # Run Frontend container
-          echo "Starting Frontend..."
-          docker run -d --name mern-frontend -p 80:80 ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
+    # Start Frontend
+    docker run -d --name mern-frontend -p 80:80 ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest || docker start mern-frontend
 
-          echo "Deployment completed successfully!"
-          EOF
+    echo "Deployment completed successfully!"
+    EOF
