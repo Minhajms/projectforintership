@@ -13,7 +13,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v2
 
-      # Step 2: Debug File Structure
+      # Step 2: Debug File Structure (Optional)
       - name: Debug File Structure
         run: ls -R
 
@@ -33,7 +33,7 @@ jobs:
       # Step 5: Build and Push Frontend Docker Image
       - name: Build and Push Frontend Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest -f ./frontend/Dockerfile ./frontend
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest -f ./client/Dockerfile ./client
           docker push ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
 
       # Step 6: Deploy on EC2
