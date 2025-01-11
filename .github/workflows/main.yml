@@ -44,6 +44,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
           docker pull ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
           docker pull ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
+          
           # Stop and remove old containers
           docker stop mern-backend || true
           docker rm mern-backend || true
@@ -51,10 +52,17 @@ jobs:
           docker rm mern-frontend || true
           docker stop mern-database || true
           docker rm mern-database || true
+          
           # Run database container
           docker run -d --name mern-database -p 27017:27017 -v mern-db-data:/data/db mongo:latest
+          until docker exec mern-database mongo --eval "db.runCommand('ping')" > /dev/null 2>&1; do
+            echo "Waiting for MongoDB to initialize..."
+            sleep 5
+          done
+
           # Run backend container
           docker run -d --name mern-backend -p 5000:5000 --env-file .env --link mern-database:mongo ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
+          
           # Run frontend container
           docker run -d --name mern-frontend -p 80:80 ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
           EOF
