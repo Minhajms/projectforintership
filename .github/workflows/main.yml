@@ -20,25 +20,31 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Step 3: Build and Push Backend Docker Image
+      # Step 3: Build and Push Docker Images
       - name: Build and Push Backend Docker Image
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest -f ./Dockerfile .
           docker push ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
 
-      # Step 4: Build and Push Frontend Docker Image
       - name: Build and Push Frontend Docker Image
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest -f ./client/Dockerfile ./client
           docker push ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
 
-      # Step 5: Set up SSH for EC2
+      # Optional: Push MongoDB Image if you have customizations
+      - name: Push MongoDB Image
+        run: |
+          docker pull mongo:latest
+          docker tag mongo:latest ${{ secrets.DOCKER_USERNAME }}/mern-db:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/mern-db:latest
+
+      # Step 4: Set up SSH for EC2
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      # Step 6: Deploy on EC2
+      # Step 5: Deploy on EC2
       - name: Deploy on EC2
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
@@ -48,19 +54,16 @@ jobs:
           # Pull updated Docker images
           docker pull ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
           docker pull ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
+          docker pull ${{ secrets.DOCKER_USERNAME }}/mern-db:latest || docker pull mongo:latest
 
-          # Stop and remove existing containers if they exist
-          docker stop mern-backend || true
-          docker rm mern-backend || true
-          docker stop mern-frontend || true
-          docker rm mern-frontend || true
-          docker stop mern-database || true
-          docker rm mern-database || true
+          # Stop and remove old containers
+          docker stop mern-backend mern-frontend mern-database || true
+          docker rm mern-backend mern-frontend mern-database || true
 
           # Run MongoDB container
           echo "Starting MongoDB..."
-          docker run -d --name mern-database -p 27017:27017 -v mern-db-data:/data/db mongo:latest
-          
+          docker run -d --name mern-database -p 27017:27017 -v mern-db-data:/data/db ${{ secrets.DOCKER_USERNAME }}/mern-db:latest
+
           # Wait for MongoDB to initialize
           until docker exec mern-database mongo --eval "db.runCommand('ping')" > /dev/null 2>&1; do
             echo "Waiting for MongoDB to initialize..."
@@ -68,11 +71,11 @@ jobs:
           done
           echo "MongoDB is ready!"
 
-          # Run backend container
+          # Run Backend container
           echo "Starting Backend..."
           docker run -d --name mern-backend -p 5000:5000 --env-file /home/ubuntu/backend/.env --link mern-database:mongo ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
 
-          # Run frontend container
+          # Run Frontend container
           echo "Starting Frontend..."
           docker run -d --name mern-frontend -p 80:80 ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
 
