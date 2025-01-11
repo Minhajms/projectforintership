@@ -49,26 +49,28 @@ jobs:
       # Step 7: Deploy on EC2
       - name: Deploy on EC2
         run: |
-          scp .env ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/home/ubuntu/backend/.env
+          # Transfer .env file to EC2 and disable host key verification for SSH
+          scp -o StrictHostKeyChecking=no .env ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/home/ubuntu/backend/.env
+
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
           set -e
           echo "Starting deployment on EC2..."
-
+          
           # Stop and remove old containers
           docker stop mern-backend mern-frontend mern-database 2>/dev/null || true
           docker rm mern-backend mern-frontend mern-database 2>/dev/null || true
-
+          
           # Pull updated Docker images
           docker pull ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
           docker pull ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
           docker pull mongo:latest
-
+          
           # Start MongoDB
           docker run -d --name mern-database -p 27017:27017 -v mern-db-data:/data/db mongo:latest
-
+          
           # Start Backend
           docker run -d --name mern-backend -p 5000:5000 --env-file /home/ubuntu/backend/.env --link mern-database:mongo ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
-
+          
           # Start Frontend
           docker run -d --name mern-frontend -p 80:80 ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
           EOF
