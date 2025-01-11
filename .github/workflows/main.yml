@@ -20,31 +20,25 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Step 3: Build and Push Docker Images
+      # Step 3: Build and Push Backend Docker Image
       - name: Build and Push Backend Docker Image
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest -f ./Dockerfile .
           docker push ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
 
+      # Step 4: Build and Push Frontend Docker Image
       - name: Build and Push Frontend Docker Image
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest -f ./client/Dockerfile ./client
           docker push ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
 
-      # Optional: Push MongoDB Image if you have customizations
-      - name: Push MongoDB Image
-        run: |
-          docker pull mongo:latest
-          docker tag mongo:latest ${{ secrets.DOCKER_USERNAME }}/mern-db:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/mern-db:latest
-
-      # Step 4: Set up SSH for EC2
+      # Step 5: Set up SSH for EC2
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.5.3
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      # Step 5: Deploy on EC2
+      # Step 6: Deploy on EC2
       - name: Deploy on EC2
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
@@ -61,14 +55,11 @@ jobs:
           docker pull mongo:latest
 
           # Start MongoDB
-          docker run -d --name mern-database -p 27017:27017 -v mern-db-data:/data/db mongo:latest || docker start mern-database
+          docker run -d --name mern-database -p 27017:27017 -v mern-db-data:/data/db mongo:latest
 
-         
           # Start Backend
-          docker run -d --name mern-backend -p 5000:5000 --env-file /home/ubuntu/backend/.env --link mern-database:mongo ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest || docker start mern-backend
+          docker run -d --name mern-backend -p 5000:5000 --env-file /home/ubuntu/backend/.env --link mern-database:mongo ${{ secrets.DOCKER_USERNAME }}/mern-backend:latest
 
           # Start Frontend
-          docker run -d --name mern-frontend -p 80:80 ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest || docker start mern-frontend
-
-          echo "Deployment completed successfully!"
+          docker run -d --name mern-frontend -p 80:80 ${{ secrets.DOCKER_USERNAME }}/mern-frontend:latest
           EOF
