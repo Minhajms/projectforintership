@@ -1,0 +1,70 @@
+name: CI/CD for MERN Stack
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout Code
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      # Step 2: Log in to Docker Hub
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      # Step 3: Build and Push Docker Images
+      - name: Build and Push Backend Docker Image
+        run: |
+          docker build -t minhajms/mern-backend:latest ./backend
+          docker push minhajms/mern-backend:latest
+
+      - name: Build and Push Database Docker Image
+        run: |
+          docker build -t minhajms/mern-db:latest ./db
+          docker push minhajms/mern-db:latest
+
+      - name: Build and Push Frontend Docker Image
+        run: |
+          docker build -t minhajms/mern-frontend:latest ./frontend
+          docker push minhajms/mern-frontend:latest
+
+      # Step 4: Set up SSH for EC2
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/docker1.pem
+          chmod 400 ~/.ssh/docker1.pem
+          ssh-keyscan -H ${{ secrets.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
+
+      # Step 5: Debug SSH Key (Optional, for debugging)
+      - name: Debug SSH Key
+        run: |
+          ls -la ~/.ssh/
+          ssh -i ~/.ssh/docker1.pem ubuntu@${{ secrets.EC2_PUBLIC_IP }} -o StrictHostKeyChecking=no echo "SSH connection successful"
+
+      # Step 6: Deploy on EC2
+      - name: Deploy on EC2
+        run: |
+          ssh -i ~/.ssh/docker1.pem ubuntu@${{ secrets.EC2_PUBLIC_IP }} << EOF
+          docker pull minhajms/mern-backend:latest
+          docker pull minhajms/mern-db:latest
+          docker pull minhajms/mern-frontend:latest
+
+          # Stop and remove old containers
+          docker stop mern-backend || true
+          docker rm mern-backend || true
+          docker stop mern-db || true
+          docker rm mern-db || true
+          docker stop mern-frontend || true
+          docker rm mern-frontend || true
+
+          # Run new containers
+          docker run -d --name mern-backend -p 5000:5000 minhajms/mern-backend:latest
+          docker run -d --name mern-db -p 27017:27017 minhajms/mern-db:latest
+          docker run -d --name mern-frontend -p 80:80 minhajms/mern-frontend:latest
+          EOF
