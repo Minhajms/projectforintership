@@ -56,6 +56,9 @@ jobs:
           set -e
           echo "Starting deployment on EC2..."
           
+          # Create the backend directory if it doesn't exist
+          mkdir -p /home/ubuntu/backend
+          
           # Stop and remove old containers
           docker stop mern-backend mern-frontend mern-database 2>/dev/null || true
           docker rm mern-backend mern-frontend mern-database 2>/dev/null || true
