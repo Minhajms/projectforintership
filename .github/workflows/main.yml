@@ -49,15 +49,15 @@ jobs:
       # Step 7: Deploy on EC2
       - name: Deploy on EC2
         run: |
-          # Transfer .env file to EC2 and disable host key verification for SSH
+          # Ensure the backend directory exists on the EC2 instance
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} "mkdir -p /home/ubuntu/backend"
+          
+          # Transfer .env file to EC2
           scp -o StrictHostKeyChecking=no .env ubuntu@${{ secrets.EC2_PUBLIC_IP }}:/home/ubuntu/backend/.env
 
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
           set -e
           echo "Starting deployment on EC2..."
-          
-          # Create the backend directory if it doesn't exist
-          mkdir -p /home/ubuntu/backend
           
           # Stop and remove old containers
           docker stop mern-backend mern-frontend mern-database 2>/dev/null || true
