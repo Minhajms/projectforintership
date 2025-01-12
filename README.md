@@ -8,7 +8,7 @@ This document outlines the steps to deploy a MERN (MongoDB, Express.js, React.js
 ## Steps Implemented
 
 ### 1. Selection of an Open-Source Repository
-- **GitHub Repository**: MERN Stack Example
+- **GitHub Repository**: MERN Stack Example ,(i have selected https://github.com/tcostadev/mern-stack-example)
 - The repository was chosen for its well-structured implementation of a MERN stack application, meeting the criteria for frontend, backend, and database layers.
 
 ### 2. Local Testing
