@@ -115,7 +115,7 @@ provider "aws" {
 }
 
 resource "aws_instance" "example" {
-  ami               = "ami-089146c5626baa6bf"
+  ami               = "xxxxxxxxxx"aim id of ec2
   instance_type     = "t3.micro"
   availability_zone = "eu-north-1a"
   key_name          = "docker1"
